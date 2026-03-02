@@ -30,11 +30,14 @@ import "./index.css";
 import dogMonitorShot from "./assets/images/dog-monitor.jpg";
 import healthShot from "./assets/images/健康分析.png";
 import advisorShot from "./assets/images/健康顾问.png";
-import healthAnalysisVideo from "./assets/videos/健康分析.mp4";
-import audioRecognitionVideo from "./assets/videos/录音识别声音.mp4";
-import emotionRecognitionVideo from "./assets/videos/拍照识别情绪.mp4";
-import smartQaVideo from "./assets/videos/智能问答.mp4";
-import behaviorRecognitionVideo from "./assets/videos/视频行为.mp4";
+
+const heroVideoSrc = {
+	emotionRecognition: "/videos/emotion-recognition",
+	behaviorRecognition: "/videos/behavior-recognition",
+	audioRecognition: "/videos/audio-recognition",
+	healthAnalysis: "/videos/health-analysis",
+	smartQa: "/videos/smart-qa",
+} as const;
 
 type HeroCarouselSlide = {
 	phase: string;
@@ -60,35 +63,35 @@ const heroCarouselSlides: [HeroCarouselSlide, ...HeroCarouselSlide[]] = [
 		title: "通过面部与体态识别，快速判断宠物当下情绪",
 		description:
 			"对应视频展示拍照后自动分析耳位、眼神和姿态，帮助你第一时间判断是否需要干预。",
-		videoSrc: emotionRecognitionVideo,
+		videoSrc: heroVideoSrc.emotionRecognition,
 	},
 	{
 		phase: "视频行为识别",
 		title: "连续追踪动作轨迹，识别潜在异常行为",
 		description:
 			"对应视频展示 AI 对走动、抓挠和停留状态的连续识别，方便判断是短时波动还是持续异常。",
-		videoSrc: behaviorRecognitionVideo,
+		videoSrc: heroVideoSrc.behaviorRecognition,
 	},
 	{
 		phase: "录音识别声音",
 		title: "识别叫声频段变化，提前发现高风险信号",
 		description:
 			"对应视频展示录音样本自动分类与风险提示，让异常叫声更早被注意到。",
-		videoSrc: audioRecognitionVideo,
+		videoSrc: heroVideoSrc.audioRecognition,
 	},
 	{
 		phase: "健康分析",
 		title: "将多模态结果汇总，形成可读的健康洞察",
 		description:
 			"对应视频展示评分、趋势和关键指标的联动分析，帮助你快速掌握整体状态。",
-		videoSrc: healthAnalysisVideo,
+		videoSrc: heroVideoSrc.healthAnalysis,
 	},
 	{
 		phase: "智能问答",
 		title: "结合历史记录对话问诊，快速得到行动建议",
 		description:
 			"对应视频展示围绕症状与历史数据的智能问答流程，减少重复描述成本。",
-		videoSrc: smartQaVideo,
+		videoSrc: heroVideoSrc.smartQa,
 	},
 ];
 
@@ -237,9 +240,15 @@ function SharedPhoneVideo({ src }: { src: string }) {
 
 function SharedPhone({
 	activeSlide,
+	activeSlideIndex,
+	onSlideChange,
+	slides,
 	scene,
 }: {
 	activeSlide: HeroCarouselSlide;
+	activeSlideIndex: number;
+	onSlideChange: (nextIndex: number) => void;
+	slides: readonly HeroCarouselSlide[];
 	scene: PhoneScene;
 }) {
 	const sceneImage = useMemo(() => {
@@ -264,10 +273,36 @@ function SharedPhone({
 				<div className="shared-phone__video-content shared-phone__video-content--visible">
 					<div className="shared-phone__video-layout">
 						<div className="shared-phone__video-header">
-							<span className="shared-phone__video-header-label">演示视频</span>
-							<span className="shared-phone__video-header-chip">
-								{activeSlide.phase}
+							<div className="shared-phone__video-header-copy">
+								<span className="shared-phone__video-header-label">
+									演示视频
+								</span>
+								<span className="shared-phone__video-header-title">
+									{activeSlide.phase}
+								</span>
+							</div>
+							<span className="shared-phone__video-header-index">
+								{activeSlideIndex + 1}/{slides.length}
 							</span>
+						</div>
+						<div className="shared-phone__video-tabs" aria-label="切换演示视频">
+							{slides.map((slide, index) => (
+								<Button
+									key={slide.videoSrc}
+									type="button"
+									variant={index === activeSlideIndex ? "default" : "outline"}
+									size="sm"
+									className={`shared-phone__video-tab ${
+										index === activeSlideIndex
+											? "shared-phone__video-tab--active"
+											: "shared-phone__video-tab--idle"
+									}`}
+									onClick={() => onSlideChange(index)}
+									aria-pressed={index === activeSlideIndex}
+								>
+									{slide.phase}
+								</Button>
+							))}
 						</div>
 						<div className="shared-phone__video-frame">
 							<SharedPhoneVideo src={activeSlide.videoSrc} />
@@ -291,6 +326,7 @@ function SharedPhone({
 
 export function App() {
 	const [storyEntry] = useState(0);
+	const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 	const [isHeroPhoneOpen, setIsHeroPhoneOpen] = useState(false);
 	const [isHeroPhoneModalVisible, setIsHeroPhoneModalVisible] = useState(false);
 	const [heroPhoneRect, setHeroPhoneRect] = useState<HeroPhoneRect | null>(
@@ -303,7 +339,20 @@ export function App() {
 	const heroPhoneButtonRef = useRef<HTMLButtonElement>(null);
 	const closeTimerRef = useRef<TimerId | null>(null);
 	const phoneScene: PhoneScene = "hero";
-	const activeSlide = heroCarouselSlides[0];
+	const activeSlide =
+		heroCarouselSlides[activeSlideIndex] ?? heroCarouselSlides[0];
+
+	const handleSlideChange = (nextIndex: number) => {
+		if (
+			nextIndex < 0 ||
+			nextIndex >= heroCarouselSlides.length ||
+			nextIndex === activeSlideIndex
+		) {
+			return;
+		}
+
+		setActiveSlideIndex(nextIndex);
+	};
 
 	const measureHeroPhone = (): HeroPhoneRect | null => {
 		const phone = heroPhoneButtonRef.current?.querySelector(".shared-phone");
@@ -616,7 +665,13 @@ export function App() {
 									<div
 										className={storyEntry < 0.02 ? "animate-float-soft" : ""}
 									>
-										<SharedPhone activeSlide={activeSlide} scene={phoneScene} />
+										<SharedPhone
+											activeSlide={activeSlide}
+											activeSlideIndex={activeSlideIndex}
+											onSlideChange={handleSlideChange}
+											slides={heroCarouselSlides}
+											scene={phoneScene}
+										/>
 									</div>
 								</div>
 							</button>
@@ -825,7 +880,13 @@ export function App() {
 								transformOrigin: "center center",
 							}}
 						>
-							<SharedPhone activeSlide={activeSlide} scene="chapter1" />
+							<SharedPhone
+								activeSlide={activeSlide}
+								activeSlideIndex={activeSlideIndex}
+								onSlideChange={handleSlideChange}
+								slides={heroCarouselSlides}
+								scene="chapter1"
+							/>
 						</div>
 					</div>
 				</div>
