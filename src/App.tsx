@@ -30,13 +30,18 @@ import "./index.css";
 import dogMonitorShot from "./assets/images/dog-monitor.jpg";
 import healthShot from "./assets/images/健康分析.png";
 import advisorShot from "./assets/images/健康顾问.png";
+import emotionRecognitionVideo from "./assets/videos/拍照识别情绪.mp4";
+import behaviorRecognitionVideo from "./assets/videos/视频行为.mp4";
+import audioRecognitionVideo from "./assets/videos/录音识别声音.mp4";
+import healthAnalysisVideo from "./assets/videos/健康分析.mp4";
+import smartQaVideo from "./assets/videos/智能问答.mp4";
 
 const heroVideoSrc = {
-	emotionRecognition: "/videos/emotion-recognition",
-	behaviorRecognition: "/videos/behavior-recognition",
-	audioRecognition: "/videos/audio-recognition",
-	healthAnalysis: "/videos/health-analysis",
-	smartQa: "/videos/smart-qa",
+	emotionRecognition: emotionRecognitionVideo,
+	behaviorRecognition: behaviorRecognitionVideo,
+	audioRecognition: audioRecognitionVideo,
+	healthAnalysis: healthAnalysisVideo,
+	smartQa: smartQaVideo,
 } as const;
 
 type HeroCarouselSlide = {
