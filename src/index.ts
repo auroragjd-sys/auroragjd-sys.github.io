@@ -4,8 +4,8 @@ import index from "./index.html";
 const server = serve({
   port: 0,
   routes: {
-    // Serve index.html for all unmatched routes.
-    "/*": index,
+    // Serve index.html at the root path.
+    "/": index,
 
     "/api/hello": {
       async GET(req) {

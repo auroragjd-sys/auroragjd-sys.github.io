@@ -857,6 +857,11 @@
   box-shadow: 0 18px 30px -22px rgb(49 28 18 / 56%);
 }
 
+.shared-phone__video-host {
+  height: 100%;
+  width: 100%;
+}
+
 .shared-phone__video {
   display: block;
   height: 100%;
