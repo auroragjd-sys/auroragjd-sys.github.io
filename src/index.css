@@ -775,6 +775,19 @@
   background: #3d2c24;
 }
 
+.shared-phone__video-content {
+  height: 100%;
+  transition: opacity 220ms ease;
+}
+
+.shared-phone__video-content--visible {
+  opacity: 1;
+}
+
+.shared-phone__video-content--hidden {
+  opacity: 0;
+}
+
 .shared-phone__image {
   display: block;
   width: 100%;

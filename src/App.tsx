@@ -48,6 +48,15 @@ type HeroCarouselSlide = {
 
 type PhoneScene = "hero" | "chapter1" | "chapter2" | "value";
 
+type HeroPhoneRect = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+};
+
+type TimerId = ReturnType<typeof setTimeout>;
+
 const heroCarouselSlides: [HeroCarouselSlide, ...HeroCarouselSlide[]] = [
   {
     phase: "拍照识别情绪",
@@ -85,6 +94,11 @@ const heroCarouselSlides: [HeroCarouselSlide, ...HeroCarouselSlide[]] = [
     videoSrc: smartQaVideo,
   },
 ];
+
+const HERO_PHONE_MODAL_HEIGHT_RATIO = 0.92;
+const HERO_PHONE_RATIO = 390 / 844;
+const HERO_PHONE_TRANSITION_MS = 520;
+const HERO_PHONE_START_ROTATE_DEG = -4;
 
 function HeroPhoneDashboard() {
   return (
@@ -179,33 +193,10 @@ function HeroPhoneDashboard() {
 function SharedPhone({
   activeSlide,
   scene,
-  onVideoEnded,
 }: {
   activeSlide: HeroCarouselSlide;
   scene: PhoneScene;
-  onVideoEnded?: () => void;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (scene !== "chapter1") {
-      return;
-    }
-
-    const video = videoRef.current;
-
-    if (!video) {
-      return;
-    }
-
-    video.currentTime = 0;
-    const playback = video.play();
-
-    if (playback) {
-      playback.catch(() => {});
-    }
-  }, [activeSlide.videoSrc, scene]);
-
   const sceneImage = useMemo(() => {
     switch (scene) {
       case "value":
@@ -225,28 +216,20 @@ function SharedPhone({
     <div className="shared-phone">
       <div className="shared-phone__notch" />
       {scene === "chapter1" ? (
-        <div className="shared-phone__video-layout">
-          <div className="shared-phone__video-header">
-            <span className="shared-phone__video-header-label">章节 1 演示</span>
-            <span className="shared-phone__video-header-chip">
-              {activeSlide.phase}
-            </span>
-          </div>
-          <div className="shared-phone__video-frame">
-            <video
-              ref={videoRef}
-              key={activeSlide.videoSrc}
-              src={activeSlide.videoSrc}
-              className="shared-phone__video"
-              autoPlay
-              muted
-              playsInline
-              preload="metadata"
-              onEnded={onVideoEnded}
-            />
-            <div className="shared-phone__video-overlay" aria-hidden="true">
-              <span className="shared-phone__video-overlay-dot" />
-              <span>正在播放</span>
+        <div className="shared-phone__video-content shared-phone__video-content--visible">
+          <div className="shared-phone__video-layout">
+            <div className="shared-phone__video-header">
+              <span className="shared-phone__video-header-label">演示视频</span>
+              <span className="shared-phone__video-header-chip">{activeSlide.phase}</span>
+            </div>
+            <div className="shared-phone__video-frame">
+              <video
+                src={activeSlide.videoSrc}
+                className="shared-phone__video"
+                controls
+                playsInline
+                preload="metadata"
+              />
             </div>
           </div>
         </div>
@@ -267,8 +250,67 @@ function SharedPhone({
 
 export function App() {
   const [storyEntry] = useState(0);
+  const [isHeroPhoneOpen, setIsHeroPhoneOpen] = useState(false);
+  const [isHeroPhoneModalVisible, setIsHeroPhoneModalVisible] = useState(false);
+  const [heroPhoneRect, setHeroPhoneRect] = useState<HeroPhoneRect | null>(null);
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window === "undefined" ? 0 : window.innerWidth,
+    height: typeof window === "undefined" ? 0 : window.innerHeight,
+  }));
+  const heroPhoneButtonRef = useRef<HTMLButtonElement>(null);
+  const closeTimerRef = useRef<TimerId | null>(null);
   const phoneScene: PhoneScene = "hero";
   const activeSlide = heroCarouselSlides[0];
+
+  const measureHeroPhone = (): HeroPhoneRect | null => {
+    const phone = heroPhoneButtonRef.current?.querySelector(".shared-phone");
+
+    if (!(phone instanceof HTMLElement)) {
+      return null;
+    }
+
+    const rect = phone.getBoundingClientRect();
+    const width = phone.offsetWidth;
+    const height = phone.offsetHeight;
+
+    return {
+      top: rect.top + rect.height / 2 - height / 2,
+      left: rect.left + rect.width / 2 - width / 2,
+      width,
+      height,
+    };
+  };
+
+  const openHeroPhone = () => {
+    const rect = measureHeroPhone();
+
+    if (!rect) {
+      return;
+    }
+
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+
+    setHeroPhoneRect(rect);
+    setIsHeroPhoneModalVisible(true);
+    setIsHeroPhoneOpen(false);
+
+    window.requestAnimationFrame(() => {
+      setIsHeroPhoneOpen(true);
+    });
+  };
+
+  const closeHeroPhone = () => {
+    const rect = measureHeroPhone();
+
+    if (rect) {
+      setHeroPhoneRect(rect);
+    }
+
+    setIsHeroPhoneOpen(false);
+  };
 
   useEffect(() => {
     const html = document.documentElement;
@@ -281,6 +323,108 @@ export function App() {
       body.classList.remove("snap-y", "snap-mandatory");
     };
   }, []);
+
+  useEffect(() => {
+    const updateViewport = () => {
+      setViewport({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+
+      if (isHeroPhoneModalVisible) {
+        const rect = measureHeroPhone();
+
+        if (rect) {
+          setHeroPhoneRect(rect);
+        }
+      }
+    };
+
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+
+    return () => {
+      window.removeEventListener("resize", updateViewport);
+    };
+  }, [isHeroPhoneModalVisible]);
+
+  useEffect(() => {
+    if (!isHeroPhoneModalVisible) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeHeroPhone();
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isHeroPhoneModalVisible]);
+
+  useEffect(() => {
+    if (!isHeroPhoneModalVisible || isHeroPhoneOpen) {
+      return;
+    }
+
+    closeTimerRef.current = setTimeout(() => {
+      setIsHeroPhoneModalVisible(false);
+      closeTimerRef.current = null;
+    }, HERO_PHONE_TRANSITION_MS);
+
+    return () => {
+      if (closeTimerRef.current !== null) {
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+    };
+  }, [isHeroPhoneModalVisible, isHeroPhoneOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  const viewportWidth = viewport.width || 1;
+  const viewportHeight = viewport.height || 1;
+  const modalHeight = viewportHeight * HERO_PHONE_MODAL_HEIGHT_RATIO;
+  const modalWidth = Math.min(
+    modalHeight * HERO_PHONE_RATIO,
+    viewportWidth * HERO_PHONE_MODAL_HEIGHT_RATIO,
+  );
+
+  const sourceRect = heroPhoneRect ?? {
+    top: viewportHeight / 2 - modalHeight / 2,
+    left: viewportWidth / 2 - modalWidth / 2,
+    width: modalWidth,
+    height: modalHeight,
+  };
+
+  const sourceCenterX = sourceRect.left + sourceRect.width / 2;
+  const sourceCenterY = sourceRect.top + sourceRect.height / 2;
+  const targetCenterX = viewportWidth / 2;
+  const targetCenterY = viewportHeight / 2;
+  const offsetX = sourceCenterX - targetCenterX;
+  const offsetY = sourceCenterY - targetCenterY;
+  const sourceScale = Math.min(
+    sourceRect.width / modalWidth,
+    sourceRect.height / modalHeight,
+  );
+  const collapsedScale = Number.isFinite(sourceScale) && sourceScale > 0 ? sourceScale : 1;
+  const phoneTransform = isHeroPhoneOpen
+    ? "none"
+    : `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${collapsedScale}) rotate(${HERO_PHONE_START_ROTATE_DEG}deg)`;
 
   const scrollHintOpacity = Math.max(0, 1 - storyEntry * 10);
   const scrollHintOffset = Math.min(14, storyEntry * 26);
@@ -410,12 +554,26 @@ export function App() {
               </div>
             </div>
 
-            <div className="hero-phone-anchor mx-auto" aria-hidden="true">
-              <div className="hero-phone-tilt">
-                <div className={storyEntry < 0.02 ? "animate-float-soft" : ""}>
-                  <SharedPhone activeSlide={activeSlide} scene={phoneScene} />
+            <div
+              className={`hero-phone-anchor mx-auto ${
+                isHeroPhoneModalVisible ? "pointer-events-none invisible" : "visible"
+              }`}
+            >
+              <button
+                ref={heroPhoneButtonRef}
+                type="button"
+                onClick={openHeroPhone}
+                className="group block h-full w-full cursor-pointer"
+                aria-label="打开手机演示视频"
+                aria-haspopup="dialog"
+                aria-expanded={isHeroPhoneModalVisible}
+              >
+                <div className="hero-phone-tilt transition-transform duration-300 group-hover:scale-[1.02]">
+                  <div className={storyEntry < 0.02 ? "animate-float-soft" : ""}>
+                    <SharedPhone activeSlide={activeSlide} scene={phoneScene} />
+                  </div>
                 </div>
-              </div>
+              </button>
             </div>
           </div>
         </div>
@@ -580,6 +738,46 @@ export function App() {
           </footer>
         </section>
       </main>
+
+      {isHeroPhoneModalVisible ? (
+        <div
+          className="fixed inset-0 z-[80]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="手机演示视频播放器"
+        >
+          <div
+            className={`absolute inset-0 transition-opacity duration-[520ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              isHeroPhoneOpen ? "bg-black/45 opacity-100 backdrop-blur-sm" : "bg-black/0 opacity-0"
+            }`}
+            aria-hidden="true"
+          />
+          <div
+            className="absolute inset-0 flex items-center justify-center px-4 py-4"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                closeHeroPhone();
+              }
+            }}
+          >
+            <div
+              className={`pointer-events-auto transition-transform duration-[520ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                isHeroPhoneOpen ? "" : "will-change-transform"
+              }`}
+              style={{
+                width: `${modalWidth}px`,
+                transform: phoneTransform,
+                transformOrigin: "center center",
+              }}
+            >
+              <SharedPhone
+                activeSlide={activeSlide}
+                scene="chapter1"
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
